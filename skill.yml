@@ -1,6 +1,6 @@
 ---
 name: wecom-deep-op
-version: 1.0.3
+version: 1.0.4
 description: 企业微信全能操作Skill - 统一封装文档、日历、会议、待办、通讯录所有企业微信MCP能力
 author: 白小圈
 authorEmail: assistant@openclaw.ai
@@ -87,3 +87,26 @@ dependencies:
   - name: "openclaw"
     version: ">=0.5.0"
     type: core
+
+# 环境变量配置声明（用于运行时配置）
+env:
+  - name: WECOM_DOC_BASE_URL
+    description: 文档服务的 MCP 接口地址（必须包含 uaKey 查询参数）
+    required: true
+    example: "https://qyapi.weixin.qq.com/mcp/bot/doc?uaKey=YOUR_UA_KEY"
+  - name: WECOM_SCHEDULE_BASE_URL
+    description: 日程服务的 MCP 接口地址（必须包含 uaKey 查询参数）
+    required: true
+    example: "https://qyapi.weixin.qq.com/mcp/bot/schedule?uaKey=YOUR_UA_KEY"
+  - name: WECOM_MEETING_BASE_URL
+    description: 会议服务的 MCP 接口地址（必须包含 uaKey 查询参数）
+    required: true
+    example: "https://qyapi.weixin.qq.com/mcp/bot/meeting?uaKey=YOUR_UA_KEY"
+  - name: WECOM_TODO_BASE_URL
+    description: 待办服务的 MCP 接口地址（必须包含 uaKey 查询参数）
+    required: true
+    example: "https://qyapi.weixin.qq.com/mcp/bot/todo?uaKey=YOUR_UA_KEY"
+  - name: WECOM_CONTACT_BASE_URL
+    description: 通讯录服务的 MCP 接口地址（必须包含 uaKey 查询参数）
+    required: true
+    example: "https://qyapi.weixin.qq.com/mcp/bot/contact?uaKey=YOUR_UA_KEY"

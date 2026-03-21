@@ -1,7 +1,7 @@
 ---
 name: wecom-deep-op
 description: 企业微信全能操作skill。封装文档、日历、会议、待办、通讯录等所有企业微信MCP能力，提供统一、简洁的接口。无需逐个调用不同MCP服务，一站式完成所有企业微信自动化操作。
-version: 1.0.3
+version: 1.0.4
 author: 白小圈 (based on Tencent WeCom official plugin)
 license: MIT
 dependencies:
