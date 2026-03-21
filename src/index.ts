@@ -10,6 +10,65 @@
  */
 
 // ============================================================================
+// Custom Error Class
+// ============================================================================
+
+/**
+ * 企业微信API错误类
+ * 封装企业微信返回的错误信息，提供更清晰的错误消息
+ */
+export class WeComError extends Error {
+  public readonly errcode: number;
+  public readonly errmsg: string;
+  public readonly data?: any;
+
+  constructor(message: string, errcode: number, errmsg: string, data?: any) {
+    super(message);
+    this.name = 'WeComError';
+    this.errcode = errcode;
+    this.errmsg = errmsg;
+    this.data = data;
+  }
+
+  toString(): string {
+    return `${this.name}: ${this.message} (errcode=${this.errcode}, errmsg=${this.errmsg})`;
+  }
+}
+
+// ============================================================================
+// Logger Utility
+// ============================================================================
+
+/**
+ * 简单日志工具
+ * 支持 debug/info/error 级别，可通过环境变量控制
+ */
+export class Logger {
+  private prefix: string;
+  private level: 'debug' | 'info' | 'error';
+
+  constructor(service: string) {
+    this.prefix = `[${service}]`;
+    const envLevel = process.env.DEBUG_LEVEL || 'info';
+    this.level = envLevel === 'debug' ? 'debug' : 'info';
+  }
+
+  debug(message: string, data?: any): void {
+    if (this.level === 'debug') {
+      console.log(`${this.prefix} DEBUG: ${message}`, data ?? '');
+    }
+  }
+
+  info(message: string): void {
+    console.log(`${this.prefix} INFO: ${message}`);
+  }
+
+  error(message: string, error?: any): void {
+    console.error(`${this.prefix} ERROR: ${message}`, error ?? '');
+  }
+}
+
+// ============================================================================
 // Configuration & Constants
 // ============================================================================
 
@@ -146,31 +205,86 @@ function getServiceUrl(service: keyof typeof WECOM_SERVICES): string {
 }
 
 /**
- * 执行 HTTP 请求到企业微信 MCP 端点
+ * 智能重试函数（指数退避）
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries = 3,
+  baseDelay = 1000
+): Promise<T> {
+  let lastError: Error | null = null;
+
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error as Error;
+
+      // 如果不是网络错误或业务错误（非0），不重试
+      if (error instanceof WeComError) {
+        // 业务错误（errcode != 0）直接抛出
+        throw error;
+      }
+
+      if (i === maxRetries - 1) break;
+
+      // 指数退避等待
+      const delay = baseDelay * Math.pow(2, i);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+
+  throw lastError;
+}
+
+/**
+ * 执行 HTTP 请求到企业微信 MCP 端点（带重试）
  */
 async function callWeComApi(
   service: keyof typeof WECOM_SERVICES,
   tool: string,
-  params: Record<string, any> = {}
+  params: Record<string, any> = {},
+  logger?: Logger
 ): Promise<Record<string, any>> {
   const baseUrl = getServiceUrl(service);
   const url = `${baseUrl}/${tool}`;
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(params)
-  });
+  const makeRequest = async () => {
+    logger?.debug(`${service}.${tool}`, params);
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`HTTP ${response.status} from ${service}.${tool}: ${text}`);
-  }
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(params)
+    });
 
-  const data = await response.json();
-  return data;
+    const data = (await response.json()) as any; // 明确声明为any
+
+    if (!response.ok || data.errcode !== 0) {
+      const errmsg = data.errmsg || `HTTP ${response.status}`;
+      logger?.error(`${service}.${tool} failed`, { errcode: data.errcode, errmsg });
+
+      if (data.errcode !== 0) {
+        // 业务错误，抛出WeComError（不重试）
+        throw new WeComError(
+          `企业微信API错误: ${errmsg}`,
+          data.errcode,
+          errmsg,
+          data
+        );
+      } else {
+        // HTTP错误，可重试
+        throw new Error(`${response.status}: ${errmsg}`);
+      }
+    }
+
+    logger?.debug(`${service}.${tool} success`);
+    return data;
+  };
+
+  return await withRetry(makeRequest, 3, 1000);
 }
 
 /**
@@ -214,9 +328,13 @@ export async function doc_get(
   url?: string,
   task_id?: string
 ): Promise<Record<string, any>> {
+  const logger = new Logger('doc');
+  logger.debug('doc_get called', { docid, url, task_id });
+
   // 🔍 智能配置检查
   const configCheck = checkServiceConfig('doc');
   if (!configCheck.ok) {
+    logger.warn('Configuration missing for doc service');
     return {
       errcode: 1,
       errmsg: 'configuration_missing',
@@ -228,7 +346,9 @@ export async function doc_get(
   }
 
   if (!docid && !url) {
-    throw new Error('doc_get requires either docid or url');
+    const err = 'doc_get requires either docid or url';
+    logger.error(err);
+    throw new Error(err);
   }
 
   const params: Record<string, any> = { type: 2 };
@@ -236,10 +356,11 @@ export async function doc_get(
   if (url) params.url = url;
   if (task_id) params.task_id = task_id;
 
-  const result = await callWeComApi('doc', 'get_doc_content', params);
+  const result = await callWeComApi('doc', 'get_doc_content', params, logger);
 
   // 如果任务未完成，需要轮询（OpenClaw不会自动轮询，这里返回task_id供后续调用）
   if (!result.task_done && !task_id) {
+    logger.info('Task started, polling required', { task_id: result.task_id });
     return {
       errcode: 0,
       errmsg: 'ok',
@@ -251,6 +372,7 @@ export async function doc_get(
 
   // 如果返回了 task_done 但没内容，可能是轮询中，返回 task_id
   if (result.task_done && !result.content && !task_id) {
+    logger.info('Task done but no content yet, polling again', { task_id: result.task_id });
     return {
       errcode: 0,
       errmsg: 'ok',
@@ -259,6 +381,7 @@ export async function doc_get(
     };
   }
 
+  logger.debug('doc_get success');
   return result;
 }
 
@@ -271,9 +394,14 @@ export async function doc_create(
   doc_type: number,
   doc_name: string
 ): Promise<Record<string, any>> {
+  const logger = new Logger('doc');
+
+  logger.info('Creating document', { doc_type, doc_name });
+
   // 🔍 智能配置检查
   const configCheck = checkServiceConfig('doc');
   if (!configCheck.ok) {
+    logger.warn('Configuration missing for doc service');
     return {
       errcode: 1,
       errmsg: 'configuration_missing',
@@ -284,10 +412,13 @@ export async function doc_create(
     };
   }
 
-  return await callWeComApi('doc', 'create_doc', {
+  const result = await callWeComApi('doc', 'create_doc', {
     doc_type,
     doc_name
-  });
+  }, logger);
+
+  logger.info('Document created successfully', { docid: result.docid });
+  return result;
 }
 
 /**
@@ -301,9 +432,13 @@ export async function doc_edit(
   content: string,
   content_type: number = 1
 ): Promise<Record<string, any>> {
+  const logger = new Logger('doc');
+  logger.info('Editing document', { docid, content_length: content.length });
+
   // 🔍 智能配置检查
   const configCheck = checkServiceConfig('doc');
   if (!configCheck.ok) {
+    logger.warn('Configuration missing for doc service');
     return {
       errcode: 1,
       errmsg: 'configuration_missing',
@@ -314,11 +449,14 @@ export async function doc_edit(
     };
   }
 
-  return await callWeComApi('doc', 'edit_doc_content', {
+  const result = await callWeComApi('doc', 'edit_doc_content', {
     docid,
     content,
     content_type
-  });
+  }, logger);
+
+  logger.info('Document edited successfully', { docid });
+  return result;
 }
 
 // ============================================================================
@@ -339,9 +477,13 @@ export async function schedule_create(
     reminders?: Array<{ type: number; minutes: number }>; // 提醒规则
   }
 ): Promise<Record<string, any>> {
+  const logger = new Logger('schedule');
+  logger.info('Creating schedule', { summary: params.summary, start_time: params.start_time });
+
   // 🔍 智能配置检查
   const configCheck = checkServiceConfig('schedule');
   if (!configCheck.ok) {
+    logger.warn('Configuration missing for schedule service');
     return {
       errcode: 1,
       errmsg: 'configuration_missing',
@@ -352,7 +494,9 @@ export async function schedule_create(
     };
   }
 
-  return await callWeComApi('schedule', 'create', params);
+  const result = await callWeComApi('schedule', 'create', params, logger);
+  logger.info('Schedule created successfully', { schedule_id: result.scheduleid });
+  return result;
 }
 
 /**
@@ -527,9 +671,13 @@ export async function meeting_create(
     meeting_room_id?: string; // 会议室ID
   }
 ): Promise<Record<string, any>> {
+  const logger = new Logger('meeting');
+  logger.info('Creating meeting', { subject: params.subject, start_time: params.start_time });
+
   // 🔍 智能配置检查
   const configCheck = checkServiceConfig('meeting');
   if (!configCheck.ok) {
+    logger.warn('Configuration missing for meeting service');
     return {
       errcode: 1,
       errmsg: 'configuration_missing',
@@ -540,7 +688,9 @@ export async function meeting_create(
     };
   }
 
-  return await callWeComApi('meeting', 'create', params);
+  const result = await callWeComApi('meeting', 'create', params, logger);
+  logger.info('Meeting created successfully', { meeting_id: result.meetingid });
+  return result;
 }
 
 /**
@@ -656,9 +806,13 @@ export async function todo_create(
     creator?: string; // 创建人 userid
   }
 ): Promise<Record<string, any>> {
+  const logger = new Logger('todo');
+  logger.info('Creating todo', { title: params.title, priority: params.priority });
+
   // 🔍 智能配置检查
   const configCheck = checkServiceConfig('todo');
   if (!configCheck.ok) {
+    logger.warn('Configuration missing for todo service');
     return {
       errcode: 1,
       errmsg: 'configuration_missing',
@@ -669,7 +823,9 @@ export async function todo_create(
     };
   }
 
-  return await callWeComApi('todo', 'create', params);
+  const result = await callWeComApi('todo', 'create', params, logger);
+  logger.info('Todo created successfully', { todo_id: result.todo_id });
+  return result;
 }
 
 /**
