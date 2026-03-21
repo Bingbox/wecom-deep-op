@@ -45,27 +45,84 @@ export class WeComError extends Error {
  */
 export class Logger {
   private prefix: string;
-  private level: 'debug' | 'info' | 'error';
+  private level: 'debug' | 'info' | 'warn' | 'error';
 
   constructor(service: string) {
     this.prefix = `[${service}]`;
-    const envLevel = process.env.DEBUG_LEVEL || 'info';
-    this.level = envLevel === 'debug' ? 'debug' : 'info';
+    const envLevel = (process.env.DEBUG_LEVEL as 'debug' | 'info' | 'warn' | 'error') || 'info';
+    this.level = envLevel;
   }
 
-  debug(message: string, data?: any): void {
-    if (this.level === 'debug') {
-      console.log(`${this.prefix} DEBUG: ${message}`, data ?? '');
+  debug(message: string, meta?: any): void {
+    if (this.level === 'debug') console.debug(this.prefix, message, meta ?? '');
+  }
+
+  info(message: string, meta?: any): void {
+    if (this.level === 'debug' || this.level === 'info') console.info(this.prefix, message, meta ?? '');
+  }
+
+  warn(message: string, meta?: any): void {
+    if (this.level === 'debug' || this.level === 'info' || this.level === 'warn') {
+      console.warn(this.prefix, message, meta ?? '');
     }
   }
 
-  info(message: string): void {
-    console.log(`${this.prefix} INFO: ${message}`);
-  }
-
   error(message: string, error?: any): void {
-    console.error(`${this.prefix} ERROR: ${message}`, error ?? '');
+    console.error(this.prefix, message, error ?? '');
   }
+}
+
+// ============================================================================
+// Validation Utilities
+// ============================================================================
+
+/**
+ * 参数验证工具 - 为所有 API 函数提供运行时验证
+ */
+function assertString(value: any, name: string): string {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new WeComError(`Invalid parameter: ${name} must be a non-empty string`, 400, 'invalid_parameter');
+  }
+  return value;
+}
+
+function assertOptionalString(value: any, name: string): string | undefined {
+  if (value !== undefined && (typeof value !== 'string' || !value.trim())) {
+    throw new WeComError(`Invalid parameter: ${name} must be a non-empty string or omitted`, 400, 'invalid_parameter');
+  }
+  return value;
+}
+
+function assertNumber(value: any, name: string, min?: number, max?: number): number {
+  if (typeof value !== 'number' || isNaN(value)) {
+    throw new WeComError(`Invalid parameter: ${name} must be a number`, 400, 'invalid_parameter');
+  }
+  if (min !== undefined && value < min) {
+    throw new WeComError(`Invalid parameter: ${name} must be >= ${min}`, 400, 'invalid_parameter');
+  }
+  if (max !== undefined && value > max) {
+    throw new WeComError(`Invalid parameter: ${name} must be <= ${max}`, 400, 'invalid_parameter');
+  }
+  return value as number;
+}
+
+function assertArray(value: any, name: string, itemValidator?: (v: any, index: number) => void): any[] {
+  if (!Array.isArray(value)) {
+    throw new WeComError(`Invalid parameter: ${name} must be an array`, 400, 'invalid_parameter');
+  }
+  if (itemValidator) {
+    for (let i = 0; i < value.length; i++) {
+      itemValidator(value[i], i);
+    }
+  }
+  return value;
+}
+
+function assertBoolean(value: any, name: string): boolean {
+  if (typeof value !== 'boolean') {
+    throw new WeComError(`Invalid parameter: ${name} must be a boolean`, 400, 'invalid_parameter');
+  }
+  return value;
 }
 
 // ============================================================================
@@ -328,6 +385,14 @@ export async function doc_get(
   url?: string,
   task_id?: string
 ): Promise<Record<string, any>> {
+  // ✅ 参数验证
+  if (docid) assertString(docid, 'docid');
+  if (url) assertString(url, 'url');
+  if (task_id) assertString(task_id, 'task_id');
+  if (!docid && !url) {
+    throw new WeComError('doc_get requires either docid or url', 400, 'invalid_parameter');
+  }
+
   const logger = new Logger('doc');
   logger.debug('doc_get called', { docid, url, task_id });
 
@@ -343,12 +408,6 @@ export async function doc_get(
         instruction: configCheck.instruction
       }
     };
-  }
-
-  if (!docid && !url) {
-    const err = 'doc_get requires either docid or url';
-    logger.error(err);
-    throw new Error(err);
   }
 
   const params: Record<string, any> = { type: 2 };
@@ -394,8 +453,11 @@ export async function doc_create(
   doc_type: number,
   doc_name: string
 ): Promise<Record<string, any>> {
-  const logger = new Logger('doc');
+  // ✅ 参数验证
+  assertNumber(doc_type, 'doc_type', 3, 10);
+  assertString(doc_name, 'doc_name');
 
+  const logger = new Logger('doc');
   logger.info('Creating document', { doc_type, doc_name });
 
   // 🔍 智能配置检查
@@ -432,6 +494,11 @@ export async function doc_edit(
   content: string,
   content_type: number = 1
 ): Promise<Record<string, any>> {
+  // ✅ 参数验证
+  assertString(docid, 'docid');
+  assertString(content, 'content');
+  assertNumber(content_type, 'content_type', 1, 1); // 必须为 1
+
   const logger = new Logger('doc');
   logger.info('Editing document', { docid, content_length: content.length });
 
@@ -477,6 +544,18 @@ export async function schedule_create(
     reminders?: Array<{ type: number; minutes: number }>; // 提醒规则
   }
 ): Promise<Record<string, any>> {
+  // ✅ 参数验证
+  assertString(params.summary, 'summary');
+  assertString(params.start_time, 'start_time');
+  assertString(params.end_time, 'end_time');
+  if (params.location !== undefined) assertString(params.location, 'location');
+  if (params.description !== undefined) assertString(params.description, 'description');
+  if (params.attendees) assertArray(params.attendees, 'attendees', (uid) => assertString(uid, 'attendee'));
+  if (params.reminders) assertArray(params.reminders, 'reminders', (r) => {
+    assertNumber(r.type, 'reminder.type', 0, 3);
+    assertNumber(r.minutes, 'reminder.minutes', 1);
+  });
+
   const logger = new Logger('schedule');
   logger.info('Creating schedule', { summary: params.summary, start_time: params.start_time });
 
@@ -508,6 +587,10 @@ export async function schedule_list(
   // 其他可选筛选参数...
   params: Record<string, any> = {}
 ): Promise<Record<string, any>> {
+  // ✅ 参数验证
+  assertString(start_time, 'start_time');
+  assertString(end_time, 'end_time');
+
   // 🔍 智能配置检查
   const configCheck = checkServiceConfig('schedule');
   if (!configCheck.ok) {
@@ -532,6 +615,9 @@ export async function schedule_list(
  * 获取日程详情
  */
 export async function schedule_get(schedule_id: string): Promise<Record<string, any>> {
+  // ✅ 参数验证
+  assertString(schedule_id, 'schedule_id');
+
   // 🔍 智能配置检查
   const configCheck = checkServiceConfig('schedule');
   if (!configCheck.ok) {
@@ -561,6 +647,14 @@ export async function schedule_update(
     description: string;
   }>
 ): Promise<Record<string, any>> {
+  // ✅ 参数验证
+  assertString(schedule_id, 'schedule_id');
+  if (updates.summary !== undefined) assertString(updates.summary, 'updates.summary');
+  if (updates.start_time !== undefined) assertString(updates.start_time, 'updates.start_time');
+  if (updates.end_time !== undefined) assertString(updates.end_time, 'updates.end_time');
+  if (updates.location !== undefined) assertString(updates.location, 'updates.location');
+  if (updates.description !== undefined) assertString(updates.description, 'updates.description');
+
   // 🔍 智能配置检查
   const configCheck = checkServiceConfig('schedule');
   if (!configCheck.ok) {
@@ -584,6 +678,9 @@ export async function schedule_update(
  * 取消日程
  */
 export async function schedule_cancel(schedule_id: string): Promise<Record<string, any>> {
+  // ✅ 参数验证
+  assertString(schedule_id, 'schedule_id');
+
   // 🔍 智能配置检查
   const configCheck = checkServiceConfig('schedule');
   if (!configCheck.ok) {
@@ -607,6 +704,10 @@ export async function schedule_add_attendee(
   schedule_id: string,
   attendee_userids: string[]
 ): Promise<Record<string, any>> {
+  // ✅ 参数验证
+  assertString(schedule_id, 'schedule_id');
+  assertArray(attendee_userids, 'attendee_userids', (uid) => assertString(uid, 'attendee'));
+
   // 🔍 智能配置检查
   const configCheck = checkServiceConfig('schedule');
   if (!configCheck.ok) {
@@ -633,6 +734,10 @@ export async function schedule_remove_attendee(
   schedule_id: string,
   attendee_userids: string[]
 ): Promise<Record<string, any>> {
+  // ✅ 参数验证
+  assertString(schedule_id, 'schedule_id');
+  assertArray(attendee_userids, 'attendee_userids', (uid) => assertString(uid, 'attendee'));
+
   // 🔍 智能配置检查
   const configCheck = checkServiceConfig('schedule');
   if (!configCheck.ok) {
@@ -671,6 +776,16 @@ export async function meeting_create(
     meeting_room_id?: string; // 会议室ID
   }
 ): Promise<Record<string, any>> {
+  // ✅ 参数验证
+  assertString(params.subject, 'subject');
+  assertString(params.start_time, 'start_time');
+  assertString(params.end_time, 'end_time');
+  if (params.type !== undefined) assertNumber(params.type, 'type', 1, 3);
+  if (params.attendees) assertArray(params.attendees, 'attendees', (uid) => assertString(uid, 'attendee'));
+  if (params.agenda !== undefined) assertString(params.agenda, 'agenda');
+  if (params.media_conf_id !== undefined) assertString(params.media_conf_id, 'media_conf_id');
+  if (params.meeting_room_id !== undefined) assertString(params.meeting_room_id, 'meeting_room_id');
+
   const logger = new Logger('meeting');
   logger.info('Creating meeting', { subject: params.subject, start_time: params.start_time });
 
@@ -701,6 +816,10 @@ export async function meeting_list(
   end_time: string,
   params: Record<string, any> = {}
 ): Promise<Record<string, any>> {
+  // ✅ 参数验证
+  assertString(start_time, 'start_time');
+  assertString(end_time, 'end_time');
+
   // 🔍 智能配置检查
   const configCheck = checkServiceConfig('meeting');
   if (!configCheck.ok) {
@@ -725,6 +844,9 @@ export async function meeting_list(
  * 获取会议详情
  */
 export async function meeting_get(meeting_id: string): Promise<Record<string, any>> {
+  // ✅ 参数验证
+  assertString(meeting_id, 'meeting_id');
+
   // 🔍 智能配置检查
   const configCheck = checkServiceConfig('meeting');
   if (!configCheck.ok) {
@@ -745,6 +867,9 @@ export async function meeting_get(meeting_id: string): Promise<Record<string, an
  * 取消会议
  */
 export async function meeting_cancel(meeting_id: string): Promise<Record<string, any>> {
+  // ✅ 参数验证
+  assertString(meeting_id, 'meeting_id');
+
   // 🔍 智能配置检查
   const configCheck = checkServiceConfig('meeting');
   if (!configCheck.ok) {
@@ -769,6 +894,11 @@ export async function meeting_update_attendees(
   add_attendees?: string[],
   remove_attendees?: string[]
 ): Promise<Record<string, any>> {
+  // ✅ 参数验证
+  assertString(meeting_id, 'meeting_id');
+  if (add_attendees) assertArray(add_attendees, 'add_attendees', (uid) => assertString(uid, 'attendee'));
+  if (remove_attendees) assertArray(remove_attendees, 'remove_attendees', (uid) => assertString(uid, 'attendee'));
+
   // 🔍 智能配置检查
   const configCheck = checkServiceConfig('meeting');
   if (!configCheck.ok) {
@@ -806,6 +936,14 @@ export async function todo_create(
     creator?: string; // 创建人 userid
   }
 ): Promise<Record<string, any>> {
+  // ✅ 参数验证
+  assertString(params.title, 'title');
+  if (params.due_time !== undefined) assertString(params.due_time, 'due_time');
+  if (params.priority !== undefined) assertNumber(params.priority, 'priority', 1, 3);
+  if (params.desc !== undefined) assertString(params.desc, 'desc');
+  if (params.receivers) assertArray(params.receivers, 'receivers', (uid) => assertString(uid, 'receiver'));
+  if (params.creator !== undefined) assertString(params.creator, 'creator');
+
   const logger = new Logger('todo');
   logger.info('Creating todo', { title: params.title, priority: params.priority });
 
@@ -836,6 +974,11 @@ export async function todo_list(
   limit?: number,
   offset?: number
 ): Promise<Record<string, any>> {
+  // ✅ 参数验证
+  if (status !== undefined) assertNumber(status, 'status', 0, 2);
+  if (limit !== undefined) assertNumber(limit, 'limit', 1, 1000);
+  if (offset !== undefined) assertNumber(offset, 'offset', 0);
+
   // 🔍 智能配置检查
   const configCheck = checkServiceConfig('todo');
   if (!configCheck.ok) {
@@ -860,6 +1003,9 @@ export async function todo_list(
  * 获取待办详情
  */
 export async function todo_get(todo_id: string): Promise<Record<string, any>> {
+  // ✅ 参数验证
+  assertString(todo_id, 'todo_id');
+
   // 🔍 智能配置检查
   const configCheck = checkServiceConfig('todo');
   if (!configCheck.ok) {
@@ -883,6 +1029,10 @@ export async function todo_update_status(
   todo_id: string,
   status: 0 | 1 | 2
 ): Promise<Record<string, any>> {
+  // ✅ 参数验证
+  assertString(todo_id, 'todo_id');
+  assertNumber(status, 'status', 0, 2);
+
   // 🔍 智能配置检查
   const configCheck = checkServiceConfig('todo');
   if (!configCheck.ok) {
@@ -914,6 +1064,13 @@ export async function todo_update(
     desc: string;
   }>
 ): Promise<Record<string, any>> {
+  // ✅ 参数验证
+  assertString(todo_id, 'todo_id');
+  if (updates.title !== undefined) assertString(updates.title, 'updates.title');
+  if (updates.due_time !== undefined) assertString(updates.due_time, 'updates.due_time');
+  if (updates.priority !== undefined) assertNumber(updates.priority, 'updates.priority', 1, 3);
+  if (updates.desc !== undefined) assertString(updates.desc, 'updates.desc');
+
   // 🔍 智能配置检查
   const configCheck = checkServiceConfig('todo');
   if (!configCheck.ok) {
@@ -937,6 +1094,9 @@ export async function todo_update(
  * 删除待办
  */
 export async function todo_delete(todo_id: string): Promise<Record<string, any>> {
+  // ✅ 参数验证
+  assertString(todo_id, 'todo_id');
+
   // 🔍 智能配置检查
   const configCheck = checkServiceConfig('todo');
   if (!configCheck.ok) {
@@ -957,6 +1117,9 @@ export async function todo_delete(todo_id: string): Promise<Record<string, any>>
  * 接收待办
  */
 export async function todo_accept(todo_id: string): Promise<Record<string, any>> {
+  // ✅ 参数验证
+  assertString(todo_id, 'todo_id');
+
   // 🔍 智能配置检查
   const configCheck = checkServiceConfig('todo');
   if (!configCheck.ok) {
@@ -980,6 +1143,10 @@ export async function todo_refuse(
   todo_id: string,
   reason?: string
 ): Promise<Record<string, any>> {
+  // ✅ 参数验证
+  assertString(todo_id, 'todo_id');
+  if (reason !== undefined) assertString(reason, 'reason');
+
   // 🔍 智能配置检查
   const configCheck = checkServiceConfig('todo');
   if (!configCheck.ok) {
@@ -1029,6 +1196,9 @@ export async function contact_get_userlist(): Promise<Record<string, any>> {
  * 说明：企业微信MCP不支持服务端搜索，本函数获取全量后本地过滤
  */
 export async function contact_search(keyword: string): Promise<Record<string, any>> {
+  // ✅ 参数验证
+  assertString(keyword, 'keyword');
+
   // 🔍 智能配置检查
   const configCheck = checkServiceConfig('contact');
   if (!configCheck.ok) {
