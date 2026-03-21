@@ -1,6 +1,6 @@
 {
   "name": "wecom-deep-op",
-  "version": "1.0.0",
+  "version": "1.0.3",
   "description": "Enterprise WeChat (wecom) all-in-one MCP wrapper skill - unifies doc, schedule, meeting, todo, contact operations",
   "main": "dist/index.cjs.js",
   "module": "dist/index.esm.js",

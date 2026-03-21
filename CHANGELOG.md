@@ -2,6 +2,32 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.0.3] - 2026-03-21
+
+### 🔧 修复（响应代码审查）
+
+**高优先级修复**:
+- ❌ 移除未使用的依赖 `@wecom/aibot-node-sdk`（package.json）
+
+**中优先级改进**:
+- ✅ 添加参数验证工具函数（assertString, assertNumber, assertArray, assertBoolean, assertOptionalString）
+- ✅ 为所有API函数添加运行时参数验证：
+  * 文档：doc_get, doc_create, doc_edit
+  * 日程：schedule_get, schedule_list, schedule_update, schedule_cancel, schedule_add_attendee, schedule_remove_attendee
+  * 会议：meeting_get, meeting_cancel, meeting_update_attendees, meeting_list
+  * 待办：todo_get, todo_list, todo_update, todo_update_status, todo_delete, todo_accept, todo_refuse
+  * 通讯录：contact_search
+- ✅ 为 `Logger` 类添加 `warn` 方法（调试级别）
+- ✅ 修复重复的 logger 声明问题（doc_edit 函数）
+- ✅ 所有验证包括：必需参数检查、类型检查、枚举值范围（如 priority: 1-3, status: 0-2）
+
+### 📝 改进
+
+- 参数验证错误返回更清晰的错误信息（包含参数名和期望值）
+- 必需参数缺失时立即抛出 `WeComError`，避免无效API调用
+
+---
+
 ## [1.0.2] - 2026-03-21
 
 ### 🔧 修复（响应代码审查）
