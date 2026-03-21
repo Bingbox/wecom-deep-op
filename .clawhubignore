@@ -1,0 +1,46 @@
+# Clawhub 发布忽略文件
+# 控制发布到 Clawhub skill market 时包含哪些文件
+
+# 开发依赖
+node_modules/
+dist/.cache?
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
+# Git 元数据
+.git/
+.gitignore
+
+# 环境与敏感配置
+.env
+.env.local
+.env.*.local
+secrets.json
+credentials.json
+mcporter.json
+config/local.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# 测试覆盖率
+coverage/
+
+# 临时文件
+tmp/
+temp/
+
+# 日志
+logs/
+
+# 不排除源码和文档（Clawhub 需要这些）
+# 所有源文件和文档都会被包含，除了上面列出的
+
