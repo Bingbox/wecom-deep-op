@@ -590,6 +590,82 @@ npm info @wecom/wecom-openclaw-plugin
 
 ---
 
+## 🌐 数据流向与安全边界
+
+### 网络请求模式说明
+
+本 Skill 的某些代码模式（"环境变量访问 + 网络发送"、"文件读取 + 网络发送"）已被静态扫描工具标记为可疑。这里详细说明其安全边界和预期用途：
+
+#### 模式1：环境变量访问 + 网络发送
+
+```typescript
+const baseUrl = process.env.WECOM_DOC_BASE_URL; // 读取用户配置
+const url = `${baseUrl}&method=doc_get`;
+fetch(url, { method: 'POST', body: JSON.stringify(params) });
+```
+
+**用途**: 调用企业微信官方 MCP 接口（由用户配置的 URL 决定）
+
+**安全边界**:
+- ✅ URL 完全由用户控制（通过 `WECOM_*_BASE_URL` 环境变量）
+- ✅ Skill 代码不硬编码任何外部域名
+- ✅ uaKey 等凭证仅在用户环境中存在，Skill 进程不记录或外传
+- ✅ 如果用户配置错误 URL，请求将失败，不会泄露数据到未知端点
+
+**审计建议**: 用户应验证 `WECOM_*_BASE_URL` 指向官方企业微信域名（`qyapi.weixin.qq.com`）。
+
+---
+
+#### 模式2：文件读取 + 网络发送
+
+```typescript
+// doc_edit: 读取用户提供的本地文件内容
+const content = fs.readFileSync(filePath, 'utf-8');
+
+// 将内容上传到企业微信文档（用户主动发起的操作）
+fetch(url, { method: 'POST', body: JSON.stringify({ content }) });
+```
+
+**用途**: 用户编辑企业微信文档时，将本地文件内容上传
+
+**安全边界**:
+- ✅ 文件路径由用户参数提供（`filePath`），Skill 不主动扫描或读取任意目录
+- ✅ 网络目标为用户配置的 MCP 接口（见模式1）
+- ✅ 这是用户明确触发的操作（调用 `doc_edit`），非后台静默行为
+- ✅ 读取的文件内容仅用于本次请求，不缓存、不记录
+
+**风险场景（非本 Skill 行为）**:
+- ❌ 如果用户提供 `/etc/passwd` 路径，Skill 会读取该文件内容（但这是用户主动行为）
+- ❌ 如果用户配置了恶意 `WECOM_DOC_BASE_URL`，数据将被发送到攻击者服务器（但这是用户配置错误）
+
+**审计建议**:
+- 用户应仅使用预期的文档文件路径
+- 确保 `WECOM_*_BASE_URL` 指向官方域名
+- 在隔离环境测试，使用非敏感文件验证功能
+
+---
+
+### 数据流总结图
+
+```
+用户输入 (参数 + 文件) 
+    ↓
+Skill 验证参数 → 读取文件（如 doc_edit）
+    ↓
+拼接 URL（来自用户环境变量 WECOM_*_BASE_URL）
+    ↓
+企业微信官方 MCP 接口（qyapi.weixin.qq.com）
+    ↓
+返回结果 → Skill 处理 → 用户
+```
+
+**关键控制点**:
+- 用户环境变量 → 决定网络端点
+- 用户参数 → 决定读取的文件和操作内容
+- Skill 代码 → 仅作为"管道"，无自主外联能力
+
+---
+
 ## 🔐 安全与隐私
 
 ### 本 Skill 的安全承诺
