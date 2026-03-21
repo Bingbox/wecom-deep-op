@@ -2,6 +2,24 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.0.1] - 2026-03-21
+
+### 🛠️ 增强（响应同事建议）
+
+**错误处理与可观测性**:
+- 新增 `WeComError` 类，统一封装企业微信业务错误（errcode/errmsg/data）
+- 新增 `Logger` 工具类，支持 `debug`/`info`/`error` 三级日志（通过 `DEBUG_LEVEL` 控制）
+- 实现 `withRetry` 函数，指数退避重试（3次，1s→2s→4s），仅对网络错误和HTTP 5xx生效
+- 为关键API函数添加日志（doc_get, doc_create, doc_edit, schedule_create, meeting_create, todo_create）
+- 统一 `callWeComApi` 错误处理，提升生产环境可调试性
+
+**依赖版本检查**:
+- `ping` 函数增强：自动检测 `@wecom/wecom-openclaw-plugin` 是否安装且版本 ≥ v1.0.13
+- `preflight_check` 增强：除了服务配置检查，现在还能发现插件缺失或版本过旧，直接给出升级命令
+- 文档强化：README 和 SKILL 均明确标注插件版本要求（≥1.0.13）和安装升级步骤
+
+---
+
 ## [1.0.0] - 2026-03-21
 
 ### ✨ 新增

@@ -26,7 +26,7 @@
 |------|------|
 | **统一接口** | 5大服务（文档/日程/会议/待办/通讯录）一个Skill搞定 |
 | **完整功能** | 基于企业微信官方 MCP API 封装，功能全覆盖 |
-| **生产就绪** | 基于 `@wecom/wecom-openclaw-plugin` v1.0.13 构建 |
+| **生产就绪** | 依赖官方插件 `@wecom/wecom-openclaw-plugin` **v1.0.13+**（必需） |
 | **安全设计** | 不存储任何token，配置完全由用户控制 |
 | **TypeScript** | 完整的类型定义，开发体验优秀 |
 | **MIT协议** | 自由使用、修改、分发 |
@@ -37,10 +37,67 @@
 
 ### 前置条件
 
-- ✅ OpenClaw 已安装（推荐 v0.5.0+）
-- ✅ Node.js 18+ 环境
-- ✅ 企业微信管理员已创建 BOT 并配置 MCP 权限
-- ✅ 已安装官方插件 `@wecom/wecom-openclaw-plugin`
+| 条件 | 说明 | 检查命令 |
+|------|------|----------|
+| **OpenClaw** | v0.5.0+ | `openclaw --version` |
+| **Node.js** | v18+ | `node --version` |
+| **企业微信 BOT** | 已创建并配置 MCP 权限 | 访问管理后台 |
+| **官方插件** | `@wecom/wecom-openclaw-plugin` ≥ **v1.0.13** | `openclaw plugin list` |
+| **配置** | 已设置 `WECOM_*_BASE_URL` 或 `mcporter.json` | `echo $WECOM_DOC_BASE_URL` |
+
+⚠️ **企业微信官方插件是硬性依赖**，如果没有安装或版本低于 v1.0.13，Skill 将无法启动。
+
+---
+
+#### 📦 安装或升级企业微信官方插件（必需）
+
+如果**未安装**或**版本低于 v1.0.13**，请按以下步骤操作：
+
+**方式一：从 Clawhub 安装（推荐）**
+```bash
+# 检查插件状态
+openclaw plugin list
+
+# 安装/升级插件（自动安装最新版）
+clawhub install @wecom/wecom-openclaw-plugin
+
+# 重启 OpenClaw Gateway 使插件生效
+openclaw gateway restart
+```
+
+**方式二：手动下载安装**
+```bash
+# 1. 进入 skill 目录
+cd ~/.openclaw/workspace/skills
+
+# 2. 下载官方插件仓库
+git clone https://github.com/wecom/wecom-openclaw-plugin.git @wecom/wecom-openclaw-plugin
+
+# 3. 安装依赖并构建
+cd @wecom/wecom-openclaw-plugin
+npm ci --only=production
+npm run build
+
+# 4. 验证安装
+ls dist/index.esm.js
+# 应该看到文件存在
+
+# 5. 重启 OpenClaw Gateway
+openclaw gateway restart
+```
+
+**验证版本**：
+```bash
+cat @wecom/wecom-openclaw-plugin/package.json | grep version
+# 期望输出: "version": "1.0.13" 或更高
+```
+
+**常见问题**：
+- ❌ `plugin not found`：插件目录不存在，请先安装
+- ❌ `版本过低`：请升级到 `v1.0.13+`
+- ❌ `构建失败`：确保 Node.js 版本 ≥ 18
+
+---
 
 ### 1. 安装 Skill
 
@@ -144,18 +201,71 @@ wecom_mcp call wecom-deep-op.doc_create '{"doc_type": 3, "doc_name": "xxx"}'
 # 验证 Skill 加载和配置
 wecom_mcp call wecom-deep-op.ping "{}"
 
-# 预期返回
+# 预期返回（正常）
 {
   "errcode": 0,
   "data": {
     "service": "wecom-deep-op",
     "version": "1.0.0",
-    "status": "healthy"
+    "status": "healthy",
+    "plugin_check": {
+      "status": "ok",
+      "version": "1.0.13"
+    },
+    "configured_services": ["doc", "schedule", ...]
   }
 }
 
-# 检查前置条件
+# 预期返回（插件版本过低）
+{
+  "errcode": 0,
+  "data": {
+    "service": "wecom-deep-op",
+    "version": "1.0.0",
+    "status": "healthy",
+    "plugin_check": {
+      "status": "outdated",
+      "version": "1.0.10",
+      "message": "官方插件版本过低: v1.0.10（需要 ≥ v1.0.13），请升级"
+    },
+    "warning": "官方插件版本过低: v1.0.10（需要 ≥ v1.0.13），请升级"
+  }
+}
+
+# 检查前置条件（全面检测：插件版本 + 配置完整性）
 wecom_mcp call wecom-deep-op.preflight_check "{}"
+```
+
+`preflight_check` 会返回：
+- ✅ 插件版本检查
+- ✅ 所有服务配置状态
+- ❌ 缺失配置的具体修复指令
+
+**示例输出（插件缺失）：**
+```json
+{
+  "errcode": 1,
+  "errmsg": "missing_dependency",
+  "data": {
+    "status": "incomplete",
+    "issues": [
+      "❌ 企业微信官方插件未安装 (@wecom/wecom-openclaw-plugin)\n  请安装: npm install @wecom/wecom-openclaw-plugin --save"
+    ],
+    "instruction": "请修复上述问题..."
+  }
+}
+```
+
+**示例输出（配置缺失）：**
+```json
+{
+  "errcode": 1,
+  "errmsg": "incomplete_configuration",
+  "data": {
+    "missing_services": ["doc", "meeting"],
+    "instruction": "请设置环境变量:\n  WECOM_DOC_BASE_URL=...\n  WECOM_MEETING_BASE_URL=..."
+  }
+}
 ```
 
 ---

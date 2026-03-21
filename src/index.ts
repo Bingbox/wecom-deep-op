@@ -1069,16 +1069,58 @@ export async function contact_search(keyword: string): Promise<Record<string, an
 // ============================================================================
 
 /**
- * 健康检查/就绪探测
- * 用于验证 skill 加载和配置是否正确
+ * 健康检查/就绪探测（Ping）
+ * 用于验证 skill 加载、插件版本和配置是否正确
+ *
+ * 新增：检查企业微信官方插件版本是否 ≥ 1.0.13
  */
 export async function ping(): Promise<Record<string, any>> {
-  // 检查环境变量配置（开发模式）
   const configuredServices = (Object.keys(WECOM_SERVICES) as Array<keyof typeof WECOM_SERVICES>)
     .filter(svc => process.env[`WECOM_${svc.toUpperCase()}_BASE_URL`])
     .map(svc => ({ service: svc, status: 'configured' }));
 
-  return {
+  // 检查插件版本
+  let pluginCheck: { status: string; version?: string; message?: string } = { status: 'unknown' };
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const pluginPkgPath = path.join(process.cwd(), 'node_modules/@wecom/wecom-openclaw-plugin/package.json');
+
+    if (fs.existsSync(pluginPkgPath)) {
+      const pluginPkg = JSON.parse(fs.readFileSync(pluginPkgPath, 'utf-8'));
+      const currentVersion = pluginPkg.version;
+      const required = '1.0.13';
+
+      // 版本比较
+      const cur = currentVersion.replace(/[^\d.]/g, '').split('.').map(Number);
+      const req = required.replace(/[^\d.]/g, '').split('.').map(Number);
+      const isCompatible =
+        cur[0] > req[0] ||
+        (cur[0] === req[0] && cur[1] > req[1]) ||
+        (cur[0] === req[0] && cur[1] === req[1] && cur[2] >= req[2]);
+
+      pluginCheck = {
+        status: isCompatible ? 'ok' : 'outdated',
+        version: currentVersion,
+        message: isCompatible
+          ? `官方插件版本符合要求 (v${currentVersion} ≥ v${required})`
+          : `官方插件版本过低: v${currentVersion}（需要 ≥ v${required}），请升级`
+      };
+    } else {
+      pluginCheck = {
+        status: 'missing',
+        message: '未检测到企业微信官方插件 (@wecom/wecom-openclaw-plugin)，请先安装'
+      };
+    }
+  } catch (e) {
+    pluginCheck = {
+      status: 'error',
+      message: `无法检测插件版本: ${e instanceof Error ? e.message : String(e)}`
+    };
+  }
+
+  // 构建响应
+  const response: any = {
     errcode: 0,
     errmsg: 'ok',
     data: {
@@ -1086,19 +1128,66 @@ export async function ping(): Promise<Record<string, any>> {
       version: skillMetadata.version,
       status: 'healthy',
       configured_services: configuredServices,
+      plugin_check: pluginCheck,
       notice: 'This skill requires mcporter.json configuration or environment variables for each service endpoint.'
     }
   };
+
+  // 如果插件异常，仍返回健康状态但加入警告
+  if (pluginCheck.status !== 'ok') {
+    response.data.warning = pluginCheck.message;
+  }
+
+  return response;
 }
 
 /**
  * 前置条件检查（Preflight）
  * 验证配置是否完整，如缺失则提供修复建议
+ *
+ * 新增：检查企业微信官方插件版本
  */
 export async function preflight_check(): Promise<Record<string, any>> {
   const missing: string[] = [];
   const present: string[] = [];
+  const warnings: string[] = [];
 
+  // 1️⃣ 检查企业微信官方插件版本
+  try {
+    // 动态导入官方插件（如果可用）
+    const wecomPluginPath = 'node_modules/@wecom/wecom-openclaw-plugin/package.json';
+    const fs = require('fs');
+    const pluginPkgPath = require('path').join(process.cwd(), wecomPluginPath);
+
+    if (fs.existsSync(pluginPkgPath)) {
+      const pluginPkg = JSON.parse(fs.readFileSync(pluginPkgPath, 'utf-8'));
+      const pluginVersion = pluginPkg.version;
+      const requiredVersion = '1.0.13';
+      const pluginName = '@wecom/wecom-openclaw-plugin';
+
+      // 简单版本比较（移除前缀，取数字部分）
+      const current = pluginVersion.replace(/[^\d.]/g, '').split('.').map(Number);
+      const required = requiredVersion.replace(/[^\d.]/g, '').split('.').map(Number);
+
+      // 如果当前版本低于最低要求
+      if (
+        current[0] < required[0] ||
+        (current[0] === required[0] && current[1] < required[1]) ||
+        (current[0] === required[0] && current[1] === required[1] && current[2] < required[2])
+      ) {
+        warnings.push(`⚠️ 企业微信官方插件版本过低: ${pluginVersion} (需要 ≥ ${requiredVersion})\n  请升级: npm install ${pluginName}@latest --save`);
+      } else {
+        present.push(` Official plugin (${pluginName} v${pluginVersion})`);
+      }
+    } else {
+      warnings.push(`❌ 企业微信官方插件未安装 (@wecom/wecom-openclaw-plugin)\n  请安装: npm install @wecom/wecom-openclaw-plugin --save`);
+    }
+  } catch (e) {
+    // 插件检查失败不影响主流程，仅记录警告
+    warnings.push(`⚠️ 无法检测企业微信官方插件版本（请手动检查）`);
+  }
+
+  // 2️⃣ 检查环境变量配置
   for (const service of Object.keys(WECOM_SERVICES) as Array<keyof typeof WECOM_SERVICES>) {
     const envVar = `WECOM_${service.toUpperCase()}_BASE_URL`;
     if (process.env[envVar]) {
@@ -1108,7 +1197,8 @@ export async function preflight_check(): Promise<Record<string, any>> {
     }
   }
 
-  if (missing.length === 0) {
+  // 3️⃣ 综合判断
+  if (missing.length === 0 && warnings.length === 0) {
     return {
       errcode: 0,
       errmsg: 'ok',
@@ -1120,17 +1210,22 @@ export async function preflight_check(): Promise<Record<string, any>> {
     };
   }
 
-  // 有缺失配置
+  // 有警告或缺失
+  const allIssues = [
+    ...warnings,
+    ...missing.map(s => `❌ 缺少服务配置: ${s}\n  请设置: WECOM_${s.toUpperCase()}_BASE_URL=https://qyapi.weixin.qq.com/mcp/bot/${s}?uaKey=YOUR_UA_KEY`)
+  ];
+
   return {
     errcode: 1,
-    errmsg: 'incomplete_configuration',
+    errmsg: missing.length > 0 ? 'incomplete_configuration' : 'outdated_dependency',
     data: {
       status: 'incomplete',
       configured_services: present,
       missing_services: missing,
-      instruction: `Set environment variables for missing services in mcporter.json or shell profile:
-${missing.map(s => `  - WECOM_${s.toUpperCase()}_BASE_URL=https://qyapi.weixin.qq.com/mcp/bot/${s}?uaKey=YOUR_UA_KEY`).join('\n')}
-`
+      version_warnings: warnings,
+      issues: allIssues,
+      instruction: `请修复以下问题以正常使用 wecom-deep-op:\n\n${allIssues.join('\n')}\n\n详情请参考 README 中的"前置条件"和"安装或升级企业微信官方插件"章节。`
     }
   };
 }
