@@ -4,7 +4,7 @@
 [![OpenClaw Skill](https://img.shields.io/badge/OpenClaw-Skill-blue)](https://openclaw.ai)
 [![Enterprise WeChat](https://img.shields.io/badge/Enterprise-WeChat-07C160)](https://work.weixin.qq.com/)
 
-> **一站式企业微信自动化解决方案** - 统一封装文档、日历、会议、待办、通讯录所有企业微信MCP能力
+> **一站式企业微信自动化解决方案** - 基于微信官方插件 @wecom/wecom-openclaw-plugin v1.0.13+， 封装的的一站式企业微信自动化解决方案 - 你可以方便操作文档、日历、会议、待办、通讯录所有企业微信MCP能力，充分发挥OpenClaw与企业微信的协同能力。
 
 ---
 
