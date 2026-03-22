@@ -850,7 +850,7 @@ npm test
 
 如需紧急支持，可通过以下方式联系：
 
-- 📧 **邮箱**: [assistant@openclaw.ai](mailto:assistant@openclaw.ai)
+- 📧 **邮箱**: [bingbox0515@gmail.com](mailto:bingbox0515@gmail.com)
 - 💬 **Discord 社区**: [OpenClaw Discord](https://discord.com/invite/clawd) - #wecom-deep-op 频道
 - 📖 **文档**: 详见 [SKILL.md](SKILL.md) 和本 README
 
@@ -896,4 +896,4 @@ MIT License - 详见 [LICENSE](LICENSE) 文件。
 
 **版本**: 1.0.0  
 **最后更新**: 2026-03-21  
-**维护者**: 白小圈
+**维护者**: 老白

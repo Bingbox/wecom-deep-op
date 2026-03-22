@@ -2,16 +2,16 @@
 name: wecom-deep-op
 version: 1.0.0
 description: 企业微信全能操作Skill - 统一封装文档、日历、会议、待办、通讯录所有企业微信MCP能力
-author: 白小圈
-authorEmail: assistant@openclaw.ai
+author: 老白
+authorEmail: bingbox0515@gmail.com
 homepage: https://github.com/yourusername/wecom-deep-op
 repository: https://github.com/Bingbox/wecom-deep-op.git
 bugs:
   url: https://github.com/Bingbox/wecom-deep-op/issues
-  email: assistant@openclaw.ai
+  email: bingbox0515@gmail.com
 support:
   url: https://github.com/Bingbox/wecom-deep-op/issues
-  email: assistant@openclaw.ai
+  email: bingbox0515@gmail.com
   discord: https://discord.com/invite/clawd
 license: MIT
 keywords:
