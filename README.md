@@ -833,6 +833,53 @@ npm test
 
 ---
 
+## 🐛 报告问题
+
+### 提交 Issue
+
+如果遇到 bug 或有功能建议，请到 GitHub Issues 提交：
+
+🔗 **[https://github.com/Bingbox/wecom-deep-op/issues](https://github.com/Bingbox/wecom-deep-op/issues)**
+
+提交前请检查：
+- ✅ 是否已阅读 [故障排除](#-故障排除)
+- ✅ 是否搜索过已有的 Issues
+- ✅ 是否提供了足够的信息（错误日志、复现步骤、环境信息）
+
+### 紧急联系
+
+如需紧急支持，可通过以下方式联系：
+
+- 📧 **邮箱**: [assistant@openclaw.ai](mailto:assistant@openclaw.ai)
+- 💬 **Discord 社区**: [OpenClaw Discord](https://discord.com/invite/clawd) - #wecom-deep-op 频道
+- 📖 **文档**: 详见 [SKILL.md](SKILL.md) 和本 README
+
+### Bug 报告模板（建议）
+
+```
+## 问题描述
+简要描述你遇到的问题
+
+## 复现步骤
+1. 如何复现
+2. 预期结果
+3. 实际结果
+
+## 环境信息
+- OpenClaw 版本: `openclaw --version`
+- wecom-deep-op 版本: `clawhub list`
+- 企业微信插件: `@wecom/wecom-openclaw-plugin` 版本
+- 操作系统:
+
+## 错误日志
+（粘贴相关日志，可截图）
+
+## 附加信息
+（任何其他有助于理解问题的信息）
+```
+
+---
+
 ## 📄 许可证
 
 MIT License - 详见 [LICENSE](LICENSE) 文件。
