@@ -1,6 +1,6 @@
 # wecom-deep-op - 企业微信全能操作 Skill
 
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-orange.svg)](https://opensource.org/licenses/Apache-2.0)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![OpenClaw Skill](https://img.shields.io/badge/OpenClaw-Skill-blue)](https://openclaw.ai)
 [![Enterprise WeChat](https://img.shields.io/badge/Enterprise-WeChat-07C160)](https://work.weixin.qq.com/)
 
@@ -29,7 +29,7 @@
 | **生产就绪** | 依赖官方插件 `@wecom/wecom-openclaw-plugin` **v1.0.13+**（必需） |
 | **安全设计** | 不存储任何token，配置完全由用户控制 |
 | **TypeScript** | 完整的类型定义，开发体验优秀 |
-| **Apache 2.0 协议** | 企业级开源协议，包含专利授权条款，自由使用、修改、分发 |
+| **MIT 协议** | 自由使用、修改、分发 |
 
 ---
 
@@ -882,7 +882,7 @@ npm test
 
 ## 📄 许可证
 
-Apache License 2.0 - 详见 [LICENSE](LICENSE) 文件。
+MIT License - 详见 [LICENSE](LICENSE) 文件。
 
 ---
 

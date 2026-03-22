@@ -19,7 +19,6 @@
     "README.md",
     "CHANGELOG.md",
     "LICENSE",
-    "NOTICE",
     "skill.yml"
   ],
   "keywords": [
@@ -35,7 +34,7 @@
     "contact"
   ],
   "author": "老白 <bingbox0515@gmail.com>",
-  "license": "Apache-2.0",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/Bingbox/wecom-deep-op.git"
