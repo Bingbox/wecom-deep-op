@@ -1,6 +1,6 @@
 ---
 name: wecom-deep-op
-version: 1.0.0
+version: 1.0.1
 description: 企业微信全能操作Skill - 统一封装文档、日历、会议、待办、通讯录所有企业微信MCP能力
 author: 老白
 authorEmail: bingbox0515@gmail.com
