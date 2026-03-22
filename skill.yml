@@ -4,7 +4,7 @@ version: 1.0.0
 description: 企业微信全能操作Skill - 统一封装文档、日历、会议、待办、通讯录所有企业微信MCP能力
 author: 老白
 authorEmail: bingbox0515@gmail.com
-homepage: https://github.com/yourusername/wecom-deep-op
+homepage: https://github.com/Bingbox/wecom-deep-op
 repository: https://github.com/Bingbox/wecom-deep-op.git
 bugs:
   url: https://github.com/Bingbox/wecom-deep-op/issues
