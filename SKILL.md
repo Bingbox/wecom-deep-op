@@ -1,6 +1,6 @@
 ---
 name: wecom-deep-op
-description: 企业微信全能操作skill。封装文档、日历、会议、待办、通讯录等所有企业微信MCP能力，提供统一、简洁的接口。无需逐个调用不同MCP服务，一站式完成所有企业微信自动化操作。
+description: 基于微信官方插件 @wecom/wecom-openclaw-plugin v1.0.13+，封装的一站式企业微信自动化解决方案 - 你可以方便操作文档、日历、会议、待办、通讯录所有企业微信MCP能力，充分发挥OpenClaw与企业微信的协同能力。
 version: 1.0.5
 author: 白小圈 (based on Tencent WeCom official plugin)
 license: MIT
@@ -17,9 +17,9 @@ dependencies:
 
 # wecom-deep-op - 企业微信全能操作 Skill
 
-> **一站式企业微信自动化解决方案**
+> **基于微信官方插件 @wecom/wecom-openclaw-plugin v1.0.13+，一站式企业微信自动化解决方案**
 
-`wecom-deep-op` 是对企业微信官方 MCP 服务的统一封装，整合了文档、日历、会议、待办、通讯录五大核心能力。你只需要配置一次，就可以通过统一的 `wecom_mcp` 接口调用所有企业微信功能。
+`wecom-deep-op` 是对企业微信官方 MCP 服务的统一封装，你可以方便操作文档、日历、会议、待办、通讯录所有企业微信MCP能力，充分发挥 OpenClaw 与企业微信的协同能力。
 
 **重要：请务必先阅读前置条件！**
 
